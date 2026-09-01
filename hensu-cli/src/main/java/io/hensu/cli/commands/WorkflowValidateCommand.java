@@ -47,6 +47,12 @@ class WorkflowValidateCommand extends WorkflowCommand {
             System.out.println("   Nodes: " + workflow.getNodes().size());
             System.out.println("   Agents: " + workflow.getAgents().size());
 
+            for (Workflow subWorkflow : loadedSubWorkflows) {
+                System.out.println("   Sub-workflow: " + subWorkflow.getMetadata().getName());
+                System.out.println("   Nodes: " + subWorkflow.getNodes().size());
+                System.out.println("   Agents: " + subWorkflow.getAgents().size());
+            }
+
             List<String> unreachable = findUnreachableNodes(workflow);
             if (!unreachable.isEmpty()) {
                 System.out.println(" [WARN] Unreachable nodes: " + String.join(", ", unreachable));

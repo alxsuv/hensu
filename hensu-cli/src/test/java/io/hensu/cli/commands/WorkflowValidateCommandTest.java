@@ -10,6 +10,7 @@ import io.hensu.dsl.WorkingDirectory;
 import io.hensu.dsl.parsers.KotlinScriptParser;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,6 +60,33 @@ class WorkflowValidateCommandTest extends BaseWorkflowCommandTest {
         assertThat(output).contains("Name: valid-workflow");
         assertThat(output).contains("Nodes: 2");
         assertThat(output).contains("Agents: 1");
+    }
+
+    @Test
+    void shouldIncludeSubWorkflowSummary() throws Exception {
+        // Given
+        String workflowName = "root-workflow";
+        String subWorkflowName = "child-workflow";
+
+        injectField(command, "workflowName", workflowName);
+        injectField(command, "withNames", List.of(subWorkflowName));
+
+        Workflow rootWorkflow = createTestWorkflow(workflowName, 1, 2);
+        Workflow childWorkflow = createTestWorkflow(subWorkflowName, 2, 3);
+
+        when(kotlinParser.parse(any(WorkingDirectory.class), eq(workflowName)))
+                .thenReturn(rootWorkflow);
+        when(kotlinParser.parse(any(WorkingDirectory.class), eq(subWorkflowName)))
+                .thenReturn(childWorkflow);
+
+        // When
+        command.run();
+
+        // Then
+        String output = outContent.toString();
+        assertThat(output).contains("Sub-workflow: child-workflow");
+        assertThat(output).contains("Nodes: 3");
+        assertThat(output).contains("Agents: 2");
     }
 
     @Test

@@ -10,6 +10,7 @@ import io.hensu.core.execution.result.ExitStatus;
 import io.hensu.core.review.ReviewHandler;
 import io.hensu.core.rubric.RubricEngine;
 import io.hensu.core.template.SimpleTemplateResolver;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.core.workflow.node.EndNode;
 import io.hensu.core.workflow.node.Node;
 import io.hensu.core.workflow.node.StandardNode;
@@ -52,7 +53,7 @@ abstract class WorkflowExecutorTestBase {
                         null,
                         new SimpleTemplateResolver(),
                         null,
-                        null);
+                        ToolRouter.empty());
     }
 
     protected static NodeLifecycleCoordinator createCoordinator(

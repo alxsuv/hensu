@@ -16,7 +16,8 @@ fun actionsTestWorkflow() = workflow("executable-actions-test") {
     agents {
         agent("writer") {
             role = "A helpful assistant that generates short messages"
-            model = "stub"
+            model = Models.GEMINI_3_1_FLASH_LITE
+            temperature = 0.0
         }
     }
 

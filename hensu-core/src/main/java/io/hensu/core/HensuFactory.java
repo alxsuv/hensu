@@ -20,8 +20,7 @@ import io.hensu.core.state.InMemoryWorkflowStateRepository;
 import io.hensu.core.state.WorkflowStateRepository;
 import io.hensu.core.template.SimpleTemplateResolver;
 import io.hensu.core.template.TemplateResolver;
-import io.hensu.core.tool.ToolDefinition;
-import io.hensu.core.tool.ToolRegistry;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.core.workflow.InMemoryWorkflowRepository;
 import io.hensu.core.workflow.WorkflowRepository;
 import java.util.*;
@@ -54,23 +53,6 @@ import java.util.*;
 /// @see HensuConfig
 /// @see Builder
 public final class HensuFactory {
-
-    /// Empty {@link ToolRegistry} used as a safe default when no registry is configured.
-    private static final ToolRegistry EMPTY_TOOL_REGISTRY =
-            new ToolRegistry() {
-                @Override
-                public void register(ToolDefinition tool) {}
-
-                @Override
-                public Optional<ToolDefinition> get(String name) {
-                    return Optional.empty();
-                }
-
-                @Override
-                public List<ToolDefinition> all() {
-                    return List.of();
-                }
-            };
 
     private HensuFactory() {
         // Utility class - prevent instantiation
@@ -227,7 +209,7 @@ public final class HensuFactory {
             ActionExecutor actionExecutor,
             WorkflowRepository workflowRepository,
             WorkflowStateRepository workflowStateRepository,
-            ToolRegistry toolRegistry) {
+            ToolRouter toolRouter) {
         RubricRepository rubricRepository = createRubricRepository(config);
         RubricEngine rubricEngine =
                 new RubricEngine(rubricRepository, new ScoreExtractingEvaluator());
@@ -248,7 +230,7 @@ public final class HensuFactory {
                         actionExecutor,
                         templateResolver,
                         workflowRepository,
-                        toolRegistry);
+                        toolRouter != null ? toolRouter : ToolRouter.empty());
 
         return new HensuEnvironment(
                 workflowExecutor,
@@ -391,7 +373,7 @@ public final class HensuFactory {
         private ActionExecutor actionExecutor = null;
         private WorkflowRepository workflowRepository;
         private WorkflowStateRepository workflowStateRepository;
-        private ToolRegistry toolRegistry;
+        private ToolRouter toolRouter;
 
         /// Sets the configuration options.
         ///
@@ -588,14 +570,16 @@ public final class HensuFactory {
             return this;
         }
 
-        /// Configures the tool registry for agent tool loop discovery.
+        /// Configures the tool router backing agent tool discovery and invocation.
         ///
-        /// Defaults to an empty registry when not set.
+        /// Defaults to {@link ToolRouter#empty()} when not set, which exposes no
+        /// tools; a runtime enables the tool loop by composing its own
+        /// {@link io.hensu.core.tool.ToolProvider} instances into a router.
         ///
-        /// @param toolRegistry the tool registry, not null
+        /// @param toolRouter the tool router, not null
         /// @return this builder for chaining, never null
-        public Builder toolRegistry(ToolRegistry toolRegistry) {
-            this.toolRegistry = toolRegistry;
+        public Builder toolRouter(ToolRouter toolRouter) {
+            this.toolRouter = toolRouter;
             return this;
         }
 
@@ -644,7 +628,7 @@ public final class HensuFactory {
                     actionExecutor,
                     workflowRepository,
                     workflowStateRepository,
-                    toolRegistry != null ? toolRegistry : EMPTY_TOOL_REGISTRY);
+                    toolRouter);
         }
     }
 

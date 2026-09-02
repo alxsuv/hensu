@@ -178,7 +178,8 @@ and sub-workflows.
 - **Rubric evaluation.** Automated quality gates score outputs against markdown rubric definitions
   and route on thresholds — self-correcting loops without custom parsing code.
 - **Agent-native tool loop.** Agents implementing `ToolCapable` drive tool calls directly via
-  `ToolSession` — budget-bounded by `maxToolCalls`, with `rawPayload` safety on LLM-generated arguments.
+  `ToolSession` — budget-bounded by `maxToolCalls`, fed by runtime-supplied tool providers, and
+  audited request-by-request through the execution listener.
 - **Time-travel backtracking.** Rewind to any previous node mid-flight, optionally edit the prompt
   in `$EDITOR`, and re-execute. Full audit trail via `ExecutionHistory`.
 - **Human review.** Optional or required approval checkpoints at any workflow step.

@@ -8,6 +8,7 @@ import io.hensu.core.execution.parallel.BranchExecutionConfig;
 import io.hensu.core.rubric.RubricEngine;
 import io.hensu.core.state.HensuState;
 import io.hensu.core.template.TemplateResolver;
+import io.hensu.core.tool.ToolInvoker;
 import io.hensu.core.tool.ToolRegistry;
 import io.hensu.core.workflow.Workflow;
 import io.hensu.core.workflow.WorkflowRepository;
@@ -31,6 +32,8 @@ import io.hensu.core.workflow.WorkflowRepository;
 /// - `actionExecutor` - For command/action execution
 /// - `rubricEngine` - For rubric-based quality evaluation
 /// - `workflowRepository` - For loading sub-workflow definitions
+/// - `toolRegistry` - For discovering the tools an agent may request
+/// - `toolInvoker` - For running the tools an agent requested
 ///
 /// @implNote Immutable after construction. Thread-safe for read access.
 /// Modified copies can be created via {@link #withState}, {@link #withListener},
@@ -57,6 +60,7 @@ public final class ExecutionContext {
     private final RubricEngine rubricEngine;
     private final WorkflowRepository workflowRepository;
     private final ToolRegistry toolRegistry;
+    private final ToolInvoker toolInvoker;
 
     private ExecutionContext(Builder builder) {
         this.state = builder.state;
@@ -71,6 +75,7 @@ public final class ExecutionContext {
         this.rubricEngine = builder.rubricEngine;
         this.workflowRepository = builder.workflowRepository;
         this.toolRegistry = builder.toolRegistry;
+        this.toolInvoker = builder.toolInvoker;
     }
 
     /// Returns the current workflow execution state.
@@ -154,6 +159,17 @@ public final class ExecutionContext {
         return toolRegistry;
     }
 
+    /// Returns the tool invoker for running the tools an agent requested.
+    ///
+    /// Distinct from {@link #getToolRegistry()} on purpose: the tool loop
+    /// discovers through the registry and executes through the invoker, so a
+    /// runtime can expose a catalog it cannot itself run.
+    ///
+    /// @return tool invoker, or null if not configured
+    public ToolInvoker getToolInvoker() {
+        return toolInvoker;
+    }
+
     /// Returns the branch execution configuration, if executing inside a parallel branch.
     ///
     /// Non-null only during branch execution within {@code ParallelNodeExecutor}.
@@ -194,6 +210,7 @@ public final class ExecutionContext {
                 .rubricEngine(this.rubricEngine)
                 .workflowRepository(this.workflowRepository)
                 .toolRegistry(this.toolRegistry)
+                .toolInvoker(this.toolInvoker)
                 .build();
     }
 
@@ -218,6 +235,7 @@ public final class ExecutionContext {
                 .rubricEngine(this.rubricEngine)
                 .workflowRepository(this.workflowRepository)
                 .toolRegistry(this.toolRegistry)
+                .toolInvoker(this.toolInvoker)
                 .build();
     }
 
@@ -242,6 +260,7 @@ public final class ExecutionContext {
                 .rubricEngine(this.rubricEngine)
                 .workflowRepository(this.workflowRepository)
                 .toolRegistry(this.toolRegistry)
+                .toolInvoker(this.toolInvoker)
                 .build();
     }
 
@@ -263,6 +282,7 @@ public final class ExecutionContext {
         private RubricEngine rubricEngine;
         private WorkflowRepository workflowRepository;
         private ToolRegistry toolRegistry;
+        private ToolInvoker toolInvoker;
 
         private Builder() {}
 
@@ -323,6 +343,11 @@ public final class ExecutionContext {
 
         public Builder toolRegistry(ToolRegistry toolRegistry) {
             this.toolRegistry = toolRegistry;
+            return this;
+        }
+
+        public Builder toolInvoker(ToolInvoker toolInvoker) {
+            this.toolInvoker = toolInvoker;
             return this;
         }
 

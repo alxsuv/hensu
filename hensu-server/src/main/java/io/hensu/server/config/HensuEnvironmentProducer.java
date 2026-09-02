@@ -7,7 +7,8 @@ import io.hensu.core.HensuFactory;
 import io.hensu.core.execution.action.ActionExecutor;
 import io.hensu.core.execution.executor.GenericNodeHandler;
 import io.hensu.core.review.ReviewHandler;
-import io.hensu.server.mcp.TenantToolRegistry;
+import io.hensu.core.tool.ToolProvider;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.server.persistence.ExecutionLeaseManager;
 import io.hensu.server.persistence.JdbcWorkflowRepository;
 import io.hensu.server.persistence.JdbcWorkflowStateRepository;
@@ -67,7 +68,7 @@ public class HensuEnvironmentProducer {
 
     @Inject ExecutionLeaseManager leaseManager;
 
-    @Inject TenantToolRegistry tenantToolRegistry;
+    @Inject Instance<ToolProvider> toolProviders;
 
     /// Produces the Hensu runtime environment for CDI injection.
     ///
@@ -86,7 +87,7 @@ public class HensuEnvironmentProducer {
                         .loadCredentials(properties)
                         .agentProviders(List.of(new LangChain4jProvider()))
                         .actionExecutor(actionExecutor)
-                        .toolRegistry(tenantToolRegistry);
+                        .toolRouter(new ToolRouter(toolProviders.stream().toList()));
 
         boolean dsActive =
                 config.getOptionalValue("quarkus.datasource.active", Boolean.class).orElse(true);

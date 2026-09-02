@@ -3,6 +3,8 @@ package io.hensu.core.execution;
 import io.hensu.core.agent.AgentResponse;
 import io.hensu.core.execution.executor.NodeResult;
 import io.hensu.core.state.HensuState;
+import io.hensu.core.tool.ToolCallEvent;
+import io.hensu.core.tool.ToolResultEvent;
 import io.hensu.core.workflow.node.Node;
 
 /// Listener for workflow execution lifecycle events.
@@ -80,6 +82,24 @@ public interface ExecutionListener {
     ///
     /// @param state the current workflow state with consistent position and context, not null
     default void onCheckpoint(HensuState state) {}
+
+    /// Called immediately before an agent's tool request is invoked.
+    ///
+    /// Fires for every request the agent makes, including tools it hallucinated:
+    /// the audit trail records what was asked for, not only what ran.
+    ///
+    /// @param event the tool request being dispatched, not null
+    /// @see #onToolResult for the matching outcome callback
+    default void onToolCall(ToolCallEvent event) {}
+
+    /// Called after a tool invocation settles, whatever the outcome.
+    ///
+    /// Fires exactly once for every {@link #onToolCall}, reporting success,
+    /// provider failure, unknown-tool rejection, or an exception during
+    /// invocation.
+    ///
+    /// @param event the invocation outcome, not null
+    default void onToolResult(ToolResultEvent event) {}
 
     /// No-op listener instance that ignores all events.
     ///

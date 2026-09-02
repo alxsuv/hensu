@@ -3,6 +3,8 @@ package io.hensu.core.execution;
 import io.hensu.core.agent.AgentResponse;
 import io.hensu.core.execution.executor.NodeResult;
 import io.hensu.core.state.HensuState;
+import io.hensu.core.tool.ToolCallEvent;
+import io.hensu.core.tool.ToolResultEvent;
 import io.hensu.core.workflow.node.Node;
 
 /// Thread-safe decorator that serialises {@link ExecutionListener} callbacks.
@@ -60,5 +62,15 @@ public final class SynchronizedListenerDecorator implements ExecutionListener {
     @Override
     public synchronized void onCheckpoint(HensuState state) {
         delegate.onCheckpoint(state);
+    }
+
+    @Override
+    public synchronized void onToolCall(ToolCallEvent event) {
+        delegate.onToolCall(event);
+    }
+
+    @Override
+    public synchronized void onToolResult(ToolResultEvent event) {
+        delegate.onToolResult(event);
     }
 }

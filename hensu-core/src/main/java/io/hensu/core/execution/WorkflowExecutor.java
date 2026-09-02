@@ -11,7 +11,7 @@ import io.hensu.core.execution.result.ExitStatus;
 import io.hensu.core.rubric.RubricEngine;
 import io.hensu.core.state.HensuState;
 import io.hensu.core.template.TemplateResolver;
-import io.hensu.core.tool.ToolRegistry;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.core.workflow.Workflow;
 import io.hensu.core.workflow.WorkflowRepository;
 import io.hensu.core.workflow.node.Node;
@@ -63,7 +63,7 @@ public class WorkflowExecutor {
     private final TemplateResolver templateResolver;
     private final ActionExecutor actionExecutor;
     private final WorkflowRepository workflowRepository;
-    private final ToolRegistry toolRegistry;
+    private final ToolRouter toolRouter;
     private final NodeLifecycleCoordinator lifecycleCoordinator;
 
     /// Creates a workflow executor with all dependencies.
@@ -75,7 +75,7 @@ public class WorkflowExecutor {
     /// @param actionExecutor        executor for executable actions, may be null
     /// @param templateResolver      resolver for `{variable}` syntax in prompts, not null
     /// @param workflowRepository    repository for loading sub-workflow definitions, may be null
-    /// @param toolRegistry          registry for discovering available tools, may be null
+    /// @param toolRouter            router for tool discovery and invocation, may be null
     public WorkflowExecutor(
             NodeExecutorRegistry nodeExecutorRegistry,
             AgentRegistry agentRegistry,
@@ -84,7 +84,7 @@ public class WorkflowExecutor {
             ActionExecutor actionExecutor,
             TemplateResolver templateResolver,
             WorkflowRepository workflowRepository,
-            ToolRegistry toolRegistry) {
+            ToolRouter toolRouter) {
         this.nodeExecutorRegistry = nodeExecutorRegistry;
         this.agentRegistry = agentRegistry;
         this.rubricEngine = rubricEngine;
@@ -94,7 +94,7 @@ public class WorkflowExecutor {
         this.actionExecutor = actionExecutor;
         this.templateResolver = templateResolver;
         this.workflowRepository = workflowRepository;
-        this.toolRegistry = toolRegistry;
+        this.toolRouter = toolRouter;
     }
 
     /// Executes a workflow without observability listener.
@@ -248,7 +248,8 @@ public class WorkflowExecutor {
                 .actionExecutor(actionExecutor)
                 .workflowRepository(workflowRepository)
                 .rubricEngine(rubricEngine)
-                .toolRegistry(toolRegistry)
+                .toolRegistry(toolRouter)
+                .toolInvoker(toolRouter)
                 .build();
     }
 

@@ -76,8 +76,9 @@ agent providers, action executors, repositories, and configuration are resolved 
 The builder is the only place where deployment-specific behavior diverges: both CLI and server wire the LangChain4j
 provider for LLM access. The CLI additionally wires a local bash executor (`CLIActionExecutor`); the server wires
 `ServerActionExecutor` that dispatches `Action.Send` to any registered `ActionHandler` (falling back to MCP for
-unrecognized handlers) while rejecting `Action.Execute` (local bash) and skipping template resolution for
-agent-originated tool calls (`rawPayload`), and delegates all components via CDI producers.
+unrecognized handlers) while rejecting `Action.Execute` (local bash), and delegates all components via CDI producers.
+Each runtime also supplies its own `ToolProvider` instances, composed into the `ToolRouter` the engine calls for
+agent tool use.
 
 See [Core Developer Guide](developer-guide-core.md) for usage patterns.
 
@@ -306,7 +307,7 @@ flowchart TD
         subgraph core["hensu-core (HensuEnvironment)"]
             direction LR
             we(["Workflow\nExecutor"]) ~~~ ne(["Node\nExecutors"]) ~~~ ae(["Action\nExecutor"]) ~~~ re(["Rubric\nEngine"])
-            tlr(["ToolLoop\nRunner"]) ~~~ tr(["Tool\nRegistry"]) ~~~ ar(["Agent\nRegistry"]) ~~~ el(["Execution\nListener"]) ~~~ wr(["Workflow\nRepository"]) ~~~ wsr(["WorkflowState\nRepository"])
+            tlr(["ToolLoop\nRunner"]) ~~~ tr(["Tool\nRouter"]) ~~~ ar(["Agent\nRegistry"]) ~~~ el(["Execution\nListener"]) ~~~ wr(["Workflow\nRepository"]) ~~~ wsr(["WorkflowState\nRepository"])
         end
     end
 
@@ -359,8 +360,10 @@ Zero-dependency Java library. Contains:
 - `AgentRegistry` / `AgentFactory` — Agent management with explicit provider wiring
 - `ActionExecutor` — Pluggable action dispatch (Send/Execute)
 - `ToolCapable` / `ToolSession` — Narrow interface for agents that support tool sessions; `ToolSession` is call-scoped (not stateful on the agent) for `ParallelNodeExecutor` safety
-- `ToolLoopRunner` — Stateless driver dispatched from `AgentLifecycleRunner` when a node declares tools and the agent implements `ToolCapable`. Iterates the sealed `AgentResponse` hierarchy (`TextResponse` = done, `ToolRequest` = continue, `Error` = done), enforcing `AgentConfig.maxToolCalls` budget (default 10, counting executed calls). Cap exhaustion → one final summarization call → `SUCCESS` or hard `FAILURE`
+- `ToolLoopRunner` — Stateless driver dispatched from `AgentLifecycleRunner` when a node declares tools and the agent implements `ToolCapable`. Iterates the sealed `AgentResponse` hierarchy (`TextResponse` = done, `ToolRequest` = continue, `Error` = done), invoking each tool through the context's `ToolInvoker` and reporting every request and outcome to the `ExecutionListener`. Enforces `AgentConfig.maxToolCalls` budget (default 10, counting executed calls). Cap exhaustion → one final summarization call → `SUCCESS` or hard `FAILURE`
 - `ToolCallResult` — Record `(toolName, success, output, error)` with `success()` / `failure()` factories
+- `ToolProvider` / `ToolInvoker` — Runtime-agnostic tool seam: a provider owns a catalog and the invocation of the tools in it
+- `ToolRouter` — Composes providers into one surface implementing both `ToolRegistry` and `ToolInvoker`; rejects duplicate tool names across providers
 - `ToolRegistry` / `ToolDefinition` — Protocol-agnostic tool descriptors used by agent-native tool loops and MCP integration
 - `RubricEngine` / `ScoreExtractingEvaluator` — Quality evaluation: reads `score` engine variable
   from context; accumulates feedback into `recommendation`; no JSON parsing
@@ -396,7 +399,7 @@ Extends core with HTTP, MCP, and multi-tenancy:
 
 - `HensuEnvironmentProducer` — CDI producer using `HensuFactory.builder()`
 - `ServerConfiguration` — Delegates core components from `HensuEnvironment` via `@Produces @Singleton`
-- `ServerActionExecutor` — Send-action dispatcher (routes to registered handlers, falls back to MCP; rejects `Action.Execute`). Skips template resolution for agent-originated tool calls (`rawPayload`) to prevent context exfiltration from LLM-generated arguments
+- `ServerActionExecutor` — Send-action dispatcher for DSL-authored actions (routes to registered handlers, falls back to MCP; rejects `Action.Execute`). Agent tool calls do not pass through it
 - `WorkflowService` — Service layer facade: start/resume executions, snapshot management
 - `WorkflowRegistryService` — Push pipeline: wraps save in `WorkflowPushLock` and invokes `SubWorkflowGraphValidator` lazily resolving sub-workflow ids through the repository
 - `WorkflowPushLock` — Cluster-wide push mutex (`pg_advisory_xact_lock` with JVM `ReentrantLock` fallback) preventing concurrent pushes on different nodes from introducing cycles
@@ -498,7 +501,8 @@ When a node declares `tools` and its agent implements `ToolCapable`, `AgentLifec
 to `ToolLoopRunner`. The agent drives tool calls directly — the sealed `AgentResponse` hierarchy controls
 flow: `TextResponse` terminates with success, `ToolRequest` continues the loop, `Error` terminates with
 failure. Budget enforced by `AgentConfig.maxToolCalls` (default 10, counting executed calls not round-trips).
-Agent-originated tool arguments use `Action.Send(rawPayload=true)` to skip template resolution.
+Tools are invoked through the context's `ToolInvoker`, and every request and outcome reaches the
+`ExecutionListener` as a `ToolCallEvent` / `ToolResultEvent` pair.
 
 ```kotlin
 node("research-topic") {
@@ -566,7 +570,7 @@ flowchart LR
     enrich(["PromptEnricher\n(7 injectors)"]) --> open(["openSession()\n(ToolCapable)"])
     open --> call(["agent.call()\n→ AgentResponse"])
     call -->|"TextResponse"| done(["SUCCESS\n(text = output)"])
-    call -->|"ToolRequest"| exec(["execute tools\n(Action.Send rawPayload)"])
+    call -->|"ToolRequest"| exec(["invoke tools\n(ToolInvoker + audit)"])
     exec -->|"budget ok"| call
     exec -->|"cap exhausted"| summary(["final summarization\ncall"])
     summary --> done
@@ -794,7 +798,7 @@ The unified architecture provides:
 8. **Pause / Resume** — Workflows checkpoint at any node and resume via `executeFrom()`. The lease protocol protects against data races when the owning node crashes
 9. **Distributed Recovery** — Heartbeat/sweeper lease protocol for crashed-node detection; atomic PostgreSQL `UPDATE…RETURNING` claim
 10. **Sub-Workflows** — Hierarchical composition via `SubWorkflowNode` with input/output mapping; `SubWorkflowGraphValidator` rejects cycles and dangling refs at push (under `WorkflowPushLock`); recursion bounded by `MAX_DEPTH = 16`; tenant isolation preserved across the boundary via `_tenant_id` propagation
-11. **Agent-Native Tool Loop** — `ToolLoopRunner` via `ToolCapable` / `ToolSession` for direct tool driving with budget enforcement
+11. **Agent-Native Tool Loop** — `ToolLoopRunner` via `ToolCapable` / `ToolSession` for direct tool driving with budget enforcement, fed by runtime-supplied `ToolProvider` instances and audited through the `ExecutionListener`
 12. **Human Review** — Checkpoints for manual approval at node execution level
 13. **Multi-Tenancy** — Java 25 `ScopedValues` for safe tenant context propagation and isolation
 14. **Storage in Core** — Repository interfaces with in-memory defaults; server delegates via CDI

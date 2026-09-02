@@ -12,6 +12,7 @@ import io.hensu.core.execution.executor.DefaultNodeExecutorRegistry;
 import io.hensu.core.execution.result.ExecutionResult;
 import io.hensu.core.execution.result.ExitStatus;
 import io.hensu.core.review.ReviewHandler;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.core.workflow.Workflow;
 import io.hensu.core.workflow.node.ActionNode;
 import io.hensu.core.workflow.node.Node;
@@ -39,7 +40,7 @@ class WorkflowExecutorActionNodeTest extends WorkflowExecutorTestBase {
                         mockActionExecutor,
                         null,
                         null,
-                        null);
+                        ToolRouter.empty());
     }
 
     @Test

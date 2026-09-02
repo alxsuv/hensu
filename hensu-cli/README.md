@@ -582,8 +582,7 @@ The CLI supports two action types that nodes can trigger during execution, imple
   specifies raw shell strings, keeping credentials out of workflow files.
 
 DSL-authored action parameters support `{variable}` template syntax, resolved from the
-current workflow context at execution time. Agent-originated tool calls bypass template
-resolution to prevent context exfiltration from LLM-generated arguments.
+current workflow context at execution time.
 
 ---
 

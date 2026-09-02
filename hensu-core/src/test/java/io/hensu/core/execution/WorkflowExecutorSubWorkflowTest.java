@@ -17,6 +17,7 @@ import io.hensu.core.execution.result.ExitStatus;
 import io.hensu.core.review.ReviewHandler;
 import io.hensu.core.state.HensuState;
 import io.hensu.core.template.SimpleTemplateResolver;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.core.workflow.InMemoryWorkflowRepository;
 import io.hensu.core.workflow.Workflow;
 import io.hensu.core.workflow.node.Node;
@@ -53,7 +54,7 @@ class WorkflowExecutorSubWorkflowTest extends WorkflowExecutorTestBase {
                         null,
                         new SimpleTemplateResolver(),
                         repository,
-                        null);
+                        ToolRouter.empty());
     }
 
     @Test
@@ -343,7 +344,7 @@ class WorkflowExecutorSubWorkflowTest extends WorkflowExecutorTestBase {
                         null,
                         null,
                         null,
-                        null);
+                        ToolRouter.empty());
 
         var sub =
                 SubWorkflowNode.builder()

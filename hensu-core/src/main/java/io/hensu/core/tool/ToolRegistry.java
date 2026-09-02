@@ -3,7 +3,7 @@ package io.hensu.core.tool;
 import java.util.List;
 import java.util.Optional;
 
-/// Registry of available tools for plan generation and execution.
+/// Registry of tools discoverable during workflow execution.
 ///
 /// Tool registries manage the set of tools available during workflow execution.
 /// The core module provides the interface; implementations may:
@@ -29,22 +29,28 @@ import java.util.Optional;
 /// // Retrieve a tool by name
 /// Optional<ToolDefinition> tool = registry.get("search");
 ///
-/// // Get all tools for plan generation
+/// // Get all tools an agent may choose from
 /// List<ToolDefinition> available = registry.all();
 /// }
 ///
 /// @see ToolDefinition for tool descriptors
-/// @see io.hensu.core.plan.Planner for plan generation using tools
+/// @see ToolRouter for the provider-backed implementation used by the engine
 public interface ToolRegistry {
 
     /// Registers a tool definition.
     ///
     /// If a tool with the same name already exists, it will be replaced.
     ///
+    /// Registration is optional: an implementation whose catalog is owned by
+    /// another component – such as {@link ToolRouter}, which is backed by
+    /// {@link ToolProvider} instances – may reject mutation with
+    /// {@link UnsupportedOperationException}.
+    ///
     /// @apiNote **Side effects**: Modifies internal tool registry
     ///
     /// @param tool the tool definition to register, not null
     /// @throws NullPointerException if tool is null
+    /// @throws UnsupportedOperationException if the implementation is not mutable
     void register(ToolDefinition tool);
 
     /// Retrieves a tool by name.
@@ -81,8 +87,12 @@ public interface ToolRegistry {
 
     /// Removes a tool by name.
     ///
+    /// Like {@link #register}, removal is optional and may be rejected with
+    /// {@link UnsupportedOperationException} by an immutable implementation.
+    ///
     /// @param name the tool identifier to remove, not null
     /// @return true if the tool was removed, false if not found
+    /// @throws UnsupportedOperationException if the implementation is not mutable
     default boolean remove(String name) {
         return false;
     }

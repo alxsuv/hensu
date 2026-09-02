@@ -19,6 +19,7 @@ import io.hensu.core.review.ReviewMode;
 import io.hensu.core.review.ReviewOutcome;
 import io.hensu.core.state.ExecutionPhase;
 import io.hensu.core.template.SimpleTemplateResolver;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.core.workflow.WorkflowTest;
 import io.hensu.core.workflow.node.StandardNode;
 import io.hensu.core.workflow.transition.ApprovalTransition;
@@ -46,7 +47,7 @@ class WorkflowExecutorHumanReviewTest extends WorkflowExecutorTestBase {
                         null,
                         new SimpleTemplateResolver(),
                         null,
-                        null);
+                        ToolRouter.empty());
     }
 
     // — Review mode routing ———————————————————————————————————————————————

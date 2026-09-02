@@ -10,7 +10,7 @@ The `hensu-core` module is the execution engine at the heart of Hensu. It provid
 - **Agent Abstraction** — Provider-agnostic AI agent interface with pluggable backends
 - **Rubric Engine** — Quality evaluation with weighted criteria, score-based routing, and LLM-based assessment
 - **Agent Tool Loop** — Native tool execution via `ToolCapable`/`ToolSession` with budget enforcement and sealed-hierarchy termination
-- **Tool Registry** — Protocol-agnostic tool descriptors for agent tool loops, plan generation, and MCP integration
+- **Tool Seam** — Protocol-agnostic tool descriptors plus the provider/router seam that feeds agent tool loops
 - **Human Review** — Optional or required review checkpoints at any workflow step
 - **Pause / Resume** — Phase-aware suspend and resume for long-running executions with out-of-band review support
 - **Action System** — Extensible action dispatch (send, execute) with pluggable executors
@@ -40,7 +40,7 @@ flowchart TD
         end
         subgraph support["Support"]
             direction LR
-            tr(["ToolRegistry"]) ~~~ tmpl(["TemplateResolver\n({var} subst)"]) ~~~ rh(["ReviewHandler\n(human-in-the-loop)"])
+            tr(["ToolRouter"]) ~~~ tmpl(["TemplateResolver\n({var} subst)"]) ~~~ rh(["ReviewHandler\n(human-in-the-loop)"])
         end
         subgraph storage["Storage"]
             direction LR
@@ -144,31 +144,32 @@ flowchart LR
 
 Score-based routing: nodes can use `ScoreTransition` to route based on evaluation scores (e.g., score >= 80 goto "approve", else goto "revise"). Nodes that write a boolean `approved` variable can use `ApprovalTransition` (`onApproval` / `onRejection` in DSL) for binary decision routing. For routing on any other declared output variable — e.g. a self-reported `status` driving a bounded work loop — use `ConditionTransition` (`onCondition` in DSL).
 
-## Tool Registry
+## Tool Seam
 
-Protocol-agnostic tool descriptors used by agent-native tool loops and MCP integration. The core defines tool shapes; actual invocation happens through `ActionExecutor` at the application layer.
+Protocol-agnostic tool descriptors plus the seam each runtime plugs its tool sources into. A `ToolProvider` owns both a catalog and the invocation of the tools in it; a `ToolRouter` composes several providers into the single object the engine wires into an execution context.
 
 ```java
-// Register tools
-ToolRegistry registry = new DefaultToolRegistry();
-registry.register(ToolDefinition.simple("search", "Search the web"));
-registry.register(ToolDefinition.of("analyze", "Analyze data",
-    List.of(ParameterDef.required("input", "string", "Data to analyze"))));
+// Compose the tools a runtime offers
+ToolRouter router = new ToolRouter(List.of(myCommandProvider, myMcpProvider));
 
-// Tools are used by planners for step generation
-// and by ActionExecutor for step execution
+// Discovery (ToolRegistry) and invocation (ToolInvoker) go through the same object
+List<ToolDefinition> available = router.all();
+ToolCallResult result = router.call("analyze", Map.of("input", "..."), context);
 ```
 
 **Key types:**
 
-| Type                  | Description                                                      |
-|-----------------------|------------------------------------------------------------------|
-| `ToolDefinition`      | Tool descriptor with name, description, and parameters           |
-| `ParameterDef`        | Parameter type with name, type, required flag, and default value |
-| `ToolRegistry`        | Interface for tool registration and lookup                       |
-| `DefaultToolRegistry` | Thread-safe ConcurrentHashMap implementation                     |
+| Type                  | Description                                                          |
+|-----------------------|----------------------------------------------------------------------|
+| `ToolDefinition`      | Tool descriptor with name, description, and parameters               |
+| `ParameterDef`        | Parameter type with name, type, required flag, and default value     |
+| `ToolProvider`        | A runtime's tool source: catalog plus invocation                     |
+| `ToolInvoker`         | Invocation half of the seam, consumed by the tool loop               |
+| `ToolRouter`          | Composes providers; implements both `ToolRegistry` and `ToolInvoker` |
+| `ToolRegistry`        | Interface for tool discovery                                         |
+| `DefaultToolRegistry` | Thread-safe ConcurrentHashMap implementation                         |
 
-The server layer populates the tool registry from MCP server connections. Tools discovered via MCP become available for agent tool loops. When a node declares tools and its agent implements `ToolCapable`, `ToolLoopRunner` resolves declared tool names against the registry, filters to the agent's declared subset, and passes full schemas into the tool session.
+The server contributes a provider backed by MCP server connections; the CLI contributes providers for local commands and stdio MCP servers. When a node declares tools and its agent implements `ToolCapable`, `ToolLoopRunner` resolves declared tool names against the router's catalog, filters to the agent's declared subset, and passes full schemas into the tool session. Two providers exposing the same tool name is a configuration error and fails the node.
 
 ## Module Structure
 
@@ -201,7 +202,7 @@ hensu-core/src/main/java/io/hensu/core/
 │   │   ├── NodeResult.java                # Primary return type for all node executors
 │   │   ├── ExecutionContext.java           # Per-execution context carrier (state + tenant)
 │   │   ├── AgentLifecycleRunner.java      # Composition-based agent call: enrich → execute → extract
-│   │   ├── ToolLoopRunner.java           # Drives agent-native tool loop (budget, feed-back, sealed termination)
+│   │   ├── ToolLoopRunner.java           # Drives agent-native tool loop (budget, feed-back, audit events, sealed termination)
 │   │   ├── StandardNodeExecutor.java      # LLM prompt execution for StandardNode
 │   │   ├── ParallelNodeExecutor.java      # Concurrent branch execution
 │   │   ├── ForkNodeExecutor.java          # Fork into parallel paths
@@ -300,10 +301,15 @@ hensu-core/src/main/java/io/hensu/core/
 │   └── evaluator/
 │       ├── RubricEvaluator.java          # Evaluator interface
 │       └── ScoreExtractingEvaluator.java # Reads score engine variable from context; accumulates recommendation feedback
-├── tool/                          # Protocol-agnostic tool descriptors
+├── tool/                          # Protocol-agnostic tool descriptors and the provider seam
 │   ├── ToolDefinition.java        # Tool shape (name, params, return type)
 │   ├── ToolCallResult.java        # Tool execution result (success/failure factories, asText())
-│   ├── ToolRegistry.java          # Tool registration/lookup interface
+│   ├── ToolProvider.java          # A runtime's tool source: catalog plus invocation
+│   ├── ToolInvoker.java           # Invocation half of the seam, consumed by the tool loop
+│   ├── ToolRouter.java            # Composes providers; ToolRegistry + ToolInvoker, rejects duplicate names
+│   ├── ToolCallEvent.java         # Audit record for a dispatched tool request
+│   ├── ToolResultEvent.java       # Audit record for a settled tool invocation (output truncated)
+│   ├── ToolRegistry.java          # Tool discovery interface
 │   └── DefaultToolRegistry.java   # Thread-safe ConcurrentHashMap implementation
 ├── review/                        # Human review support
 │   ├── ReviewHandler.java         # Review callback interface

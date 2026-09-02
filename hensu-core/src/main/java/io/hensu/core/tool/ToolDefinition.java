@@ -6,13 +6,12 @@ import java.util.Objects;
 /// Describes a callable tool without implementation details.
 ///
 /// Tool definitions are protocol-agnostic descriptors used by:
-/// - Plan generation (LLM or static) to select appropriate tools
-/// - Plan execution to validate tool calls
+/// - Agents, to decide which tool to request
+/// - The tool loop, to validate the tool an agent asked for
 /// - MCP integration at the server layer
 ///
-/// The core module only defines the tool shape; actual invocation
-/// happens through {@link io.hensu.core.execution.action.ActionHandler}
-/// implementations at the server layer.
+/// The core module only defines the tool shape; actual invocation happens
+/// through {@link ToolProvider} implementations contributed by each runtime.
 ///
 /// ### Contracts
 /// - **Precondition**: `name` must not be null or blank
@@ -34,8 +33,8 @@ import java.util.Objects;
 /// @param description human-readable description for LLM context, not null
 /// @param parameters input parameters accepted by the tool, not null (may be empty)
 /// @param returnType description of the tool's output, may be null
-/// @see ToolRegistry for tool registration
-/// @see io.hensu.core.plan.PlannedStep for tool invocation in plans
+/// @see ToolRegistry for tool discovery
+/// @see ToolProvider for tool invocation
 public record ToolDefinition(
         String name, String description, List<ParameterDef> parameters, ParameterDef returnType) {
 

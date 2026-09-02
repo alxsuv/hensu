@@ -9,6 +9,7 @@ import io.hensu.core.execution.executor.NodeResult;
 import io.hensu.core.execution.result.ExecutionResult;
 import io.hensu.core.execution.result.ExitStatus;
 import io.hensu.core.review.ReviewHandler;
+import io.hensu.core.tool.ToolRouter;
 import io.hensu.core.workflow.Workflow;
 import io.hensu.core.workflow.node.GenericNode;
 import io.hensu.core.workflow.node.Node;
@@ -37,7 +38,7 @@ class WorkflowExecutorGenericNodeTest extends WorkflowExecutorTestBase {
                         null,
                         null,
                         null,
-                        null);
+                        ToolRouter.empty());
     }
 
     @Test

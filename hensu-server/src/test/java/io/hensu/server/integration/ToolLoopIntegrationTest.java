@@ -4,14 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.hensu.core.execution.action.ActionExecutor;
 import io.hensu.core.state.HensuSnapshot;
-import io.hensu.core.tool.ToolDefinition;
-import io.hensu.server.mcp.TenantToolRegistry;
 import io.hensu.server.workflow.ExecutionStartResult;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,13 +17,12 @@ import org.junit.jupiter.api.Test;
 /// Integration tests for the agent-native tool loop.
 ///
 /// Verifies end-to-end tool execution through the full Quarkus stack:
-/// stub agent → ToolLoopRunner → ActionExecutor → TestActionHandler → stub feed-back
-///  → final answer.
+/// stub agent → ToolLoopRunner → ToolRouter → TestToolProvider → TestActionHandler
+/// → stub feed-back → final answer.
 @QuarkusTest
 @TestProfile(InMemoryTestProfile.class)
 class ToolLoopIntegrationTest extends IntegrationTestBase {
 
-    @Inject TenantToolRegistry toolRegistry;
     @Inject TestActionHandler testActionHandler;
     @Inject ActionExecutor actionExecutor;
 
@@ -34,13 +30,6 @@ class ToolLoopIntegrationTest extends IntegrationTestBase {
     void setUpTools() {
         testActionHandler.reset();
         actionExecutor.registerHandler(testActionHandler);
-        toolRegistry.register(
-                ToolDefinition.of(
-                        "test-tool",
-                        "Test tool for integration tests",
-                        List.of(
-                                ToolDefinition.ParameterDef.required(
-                                        "input", "string", "Input parameter"))));
     }
 
     @Test
